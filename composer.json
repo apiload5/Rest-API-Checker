@@ -1,0 +1,9 @@
+{
+    "name": "api-testing-tool",
+    "require": {
+        "php": "^8.0"
+    },
+    "require-dev": {
+        "squizlabs/php_codesniffer": "^3.7"
+    }
+}
