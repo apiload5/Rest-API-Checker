@@ -1,8 +1,8 @@
 {
+  "version": 2,
   "functions": {
     "api/*.php": {
-      "runtime": "vercel-php@0.6.0",
-      "maxDuration": 10
+      "runtime": "vercel-php@0.6.0"
     }
   },
   "routes": [
@@ -15,8 +15,6 @@
       "dest": "/index.php"
     }
   ],
-  "env": {
-    "PHP_INI_SCAN_DIR": "/var/task/user/php/conf.d:/var/task/php/conf.d"
-  },
-  "buildCommand": "composer install"
+  "buildCommand": "",
+  "installCommand": ""
 }
