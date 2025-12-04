@@ -1,52 +1,85 @@
 <?php
-// Simple proxy without external dependencies
+// Simple API Proxy without external dependencies
 header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: *");
-header("Access-Control-Allow-Headers: *");
+header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, PATCH, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
 
+// Handle preflight requests
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    exit(0);
+    http_response_code(200);
+    exit();
 }
 
+// Get request data
 $input = json_decode(file_get_contents('php://input'), true);
 
-if (empty($input['url'])) {
+if (!isset($input['url']) || empty($input['url'])) {
     http_response_code(400);
-    echo json_encode(['error' => 'URL required']);
-    exit;
+    echo json_encode(['error' => 'URL is required']);
+    exit();
 }
 
-// Use file_get_contents for simple GET requests
-$context = stream_context_create([
-    'http' => [
-        'method' => $input['method'] ?? 'GET',
-        'header' => implode("\r\n", $input['headers'] ?? []),
-        'content' => $input['body'] ?? null,
-        'timeout' => 9,
-        'ignore_errors' => true
-    ],
-    'ssl' => [
-        'verify_peer' => false,
-        'verify_peer_name' => false
-    ]
-]);
+$url = $input['url'];
+$method = strtoupper($input['method'] ?? 'GET');
+$headers = $input['headers'] ?? [];
+$body = $input['body'] ?? null;
+$timeout = 8; // 8 seconds for Vercel safety
 
-$response = @file_get_contents($input['url'], false, $context);
+// Prepare headers array for cURL
+$curlHeaders = [];
+foreach ($headers as $key => $value) {
+    $curlHeaders[] = "$key: $value";
+}
 
-if ($response === false) {
+// Initialize cURL
+$ch = curl_init();
+
+// Set basic options
+curl_setopt($ch, CURLOPT_URL, $url);
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+curl_setopt($ch, CURLOPT_TIMEOUT, $timeout);
+curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $method);
+
+// Set headers if any
+if (!empty($curlHeaders)) {
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $curlHeaders);
+}
+
+// Set request body for POST, PUT, PATCH
+if (in_array($method, ['POST', 'PUT', 'PATCH', 'DELETE']) && $body !== null) {
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $body);
+}
+
+// Execute request
+$startTime = microtime(true);
+$response = curl_exec($ch);
+$httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+$totalTime = microtime(true) - $startTime;
+
+if (curl_errno($ch)) {
+    $error = curl_error($ch);
+    curl_close($ch);
+    
     http_response_code(500);
-    echo json_encode(['error' => 'Request failed']);
-    exit;
+    echo json_encode([
+        'error' => 'cURL Error: ' . $error,
+        'time' => round($totalTime * 1000) . 'ms'
+    ]);
+    exit();
 }
 
-// Get HTTP status
-preg_match('/HTTP\/\d\.\d\s+(\d+)/', $http_response_header[0] ?? '', $matches);
-$status = $matches[1] ?? 200;
+curl_close($ch);
 
+// Return successful response
 http_response_code(200);
 echo json_encode([
-    'status' => (int)$status,
+    'status' => $httpCode,
     'body' => $response,
-    'headers' => $http_response_header
+    'headers' => [], // Can add header capture if needed
+    'time' => round($totalTime * 1000) . 'ms',
+    'size' => strlen($response)
 ]);
 ?>
