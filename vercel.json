@@ -4,10 +4,6 @@
     {
       "src": "*.php",
       "use": "@vercel/php"
-    },
-    {
-      "src": "api/*.php",
-      "use": "@vercel/php"
     }
   ],
   "routes": [
@@ -18,10 +14,6 @@
     {
       "src": "/(.*)",
       "dest": "/index.php"
-    },
-    {
-      "src": "/assets/(.*)",
-      "dest": "/assets/$1"
     }
   ]
 }
